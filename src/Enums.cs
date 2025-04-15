@@ -17,9 +17,9 @@ public class Enums
 
     public static void UnregisterValues()
     {
-        Unregister<SoundID>((ExtEnum<SoundID>)(object)scavcry);
-        Unregister<SoundID>((ExtEnum<SoundID>)(object)munch);
-        Unregister<SoundID>((ExtEnum<SoundID>)(object)yummers);
+        Unregister(scavcry);
+        Unregister(munch);
+        Unregister(yummers);
     }
 
     private static void Unregister<T>(ExtEnum<T> extEnum) where T : ExtEnum<T>

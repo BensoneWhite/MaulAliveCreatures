@@ -4,7 +4,6 @@ using MoreSlugcats;
 using RWCustom;
 using System;
 using UnityEngine;
-using static JollyCoop.JollyEnums;
 using static MoreSlugcats.MoreSlugcatsEnums;
 using static Player;
 
@@ -28,69 +27,47 @@ public static class Hooks
         On.SlugcatStats.SlugcatCanMaul += SlugcatStats_SlugcatCanMaul;
     }
 
-    public static void Unhook()
-    {
-        IL.Player.GrabUpdate -= Player_GrabUpdate;
-        On.Lizard.Violence -= Lizard_Violence;
-        On.Creature.Violence -= Creature_Violence;
-        On.Player.ReleaseGrasp -= Player_ReleaseGrasp;
-        On.Player.TossObject -= Player_TossObject;
-        On.Player.GrabUpdate -= Player_GrabUpdate1;
-        On.Player.Grabability -= Player_Grabability;
-        On.Player.CanEatMeat -= Player_CanEatMeat;
-        On.Player.CanMaulCreature -= Player_CanMaulCreature;
-        On.SlugcatStats.SlugcatCanMaul -= SlugcatStats_SlugcatCanMaul;
-    }
-
     private static bool SlugcatStats_SlugcatCanMaul(On.SlugcatStats.orig_SlugcatCanMaul orig, SlugcatStats.Name slugcatNum)
     {
-        orig.Invoke(slugcatNum);
-        bool maulPups = OptionsMenu.CanMaulPups.Value;
-        bool canMaul = OptionsMenu.CanMaul.Value;
+        bool originalResult = orig(slugcatNum);
         bool canMaulMSC = OptionsMenu.NoMaulMSC.Value;
-        if (ModManager.MSC && canMaulMSC && ((ExtEnum<Name>)(object)slugcatNum == (ExtEnum<Name>)(object)SlugcatStatsName.Saint || (ExtEnum<Name>)(object)slugcatNum == (ExtEnum<Name>)(object)SlugcatStatsName.Spear))
+
+        if (ModManager.MSC && canMaulMSC && (slugcatNum == SlugcatStatsName.Saint || slugcatNum == SlugcatStatsName.Spear))
         {
-            return orig.Invoke(slugcatNum);
+            return originalResult;
         }
-        if (maulPups)
-        {
-            return true;
-        }
-        if (canMaul && !maulPups)
-        {
-            return canMaul;
-        }
-        return orig.Invoke(slugcatNum);
+
+        return OptionsMenu.CanMaulPups.Value || (OptionsMenu.CanMaul.Value ? OptionsMenu.CanMaul.Value : originalResult);
     }
 
     private static bool Player_CanMaulCreature(On.Player.orig_CanMaulCreature orig, Player self, Creature crit)
     {
-        orig.Invoke(self, crit);
-        bool canMaul = true;
-        bool critChecks = crit is not Cicada || crit is not Yeek || crit is not JetFish;
-        bool critStun = !crit.Stunned || crit.Stunned;
-        bool sessionStory = ((UpdatableAndDeletable)self).room.game.IsStorySession;
-        bool sessionArena = ((UpdatableAndDeletable)self).room.game.IsArenaSession;
         bool maulPups = OptionsMenu.CanMaulPups.Value;
         bool maulAllies = OptionsMenu.EnableMaulAllies.Value;
         bool canMaulMSC = OptionsMenu.NoMaulMSC.Value;
-        if (!maulPups)
+        bool sessionStory = self.room.game.IsStorySession;
+        bool sessionArena = self.room.game.IsArenaSession;
+
+        bool critStun = true;
+
+        bool canMaul = true;
+
+        if (!maulPups && crit is Player player && (player.isNPC || player.isSlugpup || !Custom.rainWorld.options.friendlyFire))
         {
-            Player player = (Player)(object)((crit is Player) ? crit : null);
-            if (crit is Player && player != null && (player.isNPC || player.isSlugpup || !Custom.rainWorld.options.friendlyFire))
-            {
-                canMaul = false;
-            }
+            canMaul = false;
         }
+
         if (maulPups && !maulAllies && crit is Player && sessionStory)
         {
             canMaul = false;
         }
-        if (ModManager.MSC && canMaulMSC && ((ExtEnum<Name>)(object)self.SlugCatClass == (ExtEnum<Name>)(object)SlugcatStatsName.Spear || (ExtEnum<Name>)(object)self.SlugCatClass == (ExtEnum<Name>)(object)SlugcatStatsName.Saint))
+
+        if (ModManager.MSC && canMaulMSC && (self.SlugCatClass == SlugcatStatsName.Spear || self.SlugCatClass == SlugcatStatsName.Saint))
         {
             canMaul = false;
         }
-        if (canMaul && critChecks && !Custom.rainWorld.options.friendlyFire && crit != null && !crit.dead && crit is not IPlayerEdible && critStun)
+
+        if (canMaul && (crit is not Cicada || crit is not Yeek || crit is not JetFish) && !Custom.rainWorld.options.friendlyFire && crit != null && !crit.dead && crit is not IPlayerEdible && critStun)
         {
             if (OptionsMenu.EnableExtraStun.Value)
             {
@@ -98,61 +75,58 @@ public static class Hooks
             }
             return true;
         }
+
         if (crit is Cicada && crit.Stunned)
-        {
             return true;
-        }
+
         if (crit is Player && crit.Stunned && sessionArena)
-        {
             return true;
-        }
+
         return false;
     }
 
     private static bool Player_CanEatMeat(On.Player.orig_CanEatMeat orig, Player self, Creature crit)
     {
-        orig.Invoke(self, crit);
         bool maulPups = OptionsMenu.CanMaulPups.Value;
-        bool playerCheck = crit is not Player && (!self.isNPC || !self.isSlugpup);
         bool canMaulMSC = OptionsMenu.NoMaulMSC.Value;
-        if (ModManager.MSC && canMaulMSC && ((ExtEnum<Name>)(object)self.SlugCatClass == (ExtEnum<Name>)(object)SlugcatStatsName.Spear || (ExtEnum<Name>)(object)self.SlugCatClass == (ExtEnum<Name>)(object)SlugcatStatsName.Saint))
+        bool playerCheck = crit is not Player && (!self.isNPC || !self.isSlugpup);
+
+        if (ModManager.MSC && canMaulMSC &&
+            (self.SlugCatClass == SlugcatStatsName.Spear || self.SlugCatClass == SlugcatStatsName.Saint))
         {
-            return orig.Invoke(self, crit);
+            return orig(self, crit);
         }
+
         if (maulPups && crit.dead)
-        {
             return true;
-        }
+
         if (!maulPups && !OptionsMenu.CantMaulCreatures.Value && crit.dead && playerCheck)
-        {
             return true;
-        }
-        return orig.Invoke(self, crit);
+
+        return orig(self, crit);
     }
 
-    private static Player.ObjectGrabability Player_Grabability(On.Player.orig_Grabability orig, Player self, PhysicalObject obj)
+    private static ObjectGrabability Player_Grabability(On.Player.orig_Grabability orig, Player self, PhysicalObject obj)
     {
-        if (obj is Player || obj is JetFish || obj is Fly || obj is Hazer || obj is PoleMimic || obj is Snail || obj is Cicada || obj is LanternMouse || obj is EggBug || obj is Centipede || obj is FlyLure || obj is SmallNeedleWorm || obj is TentaclePlant || obj is VultureGrub || obj is Spider)
+        if (obj is Player or JetFish or Fly or Hazer or PoleMimic or Snail or Cicada
+            or LanternMouse or EggBug or Centipede or FlyLure or SmallNeedleWorm or TentaclePlant
+            or VultureGrub or Spider)
         {
-            return orig.Invoke(self, obj);
+            return orig(self, obj);
         }
-        if (obj is not Scavenger && obj is not BigEel)
+
+        if (obj is not Scavenger and not BigEel)
         {
-            Player player = (Player)(object)((obj is Player) ? obj : null);
-            if ((player == null || (!player.isNPC && !player.isSlugpup)) && obj is not Hazer && obj is not VultureGrub)
+            if (obj is not Player player || (!player.isNPC && !player.isSlugpup) && obj is not Hazer && obj is not VultureGrub)
             {
-                if (obj is BigJellyFish || obj is Yeek)
-                {
-                    return (ObjectGrabability)3;
-                }
+                if (obj is BigJellyFish or Yeek)
+                    return ObjectGrabability.TwoHands;
                 if (obj is Creature)
-                {
-                    return (ObjectGrabability)4;
-                }
-                return orig.Invoke(self, obj);
+                    return ObjectGrabability.Drag;
+                return orig(self, obj);
             }
         }
-        return (ObjectGrabability)1;
+        return ObjectGrabability.OneHand;
     }
 
     private static void Player_GrabUpdate1(On.Player.orig_GrabUpdate orig, Player self, bool eu)
@@ -160,7 +134,7 @@ public static class Hooks
         mauling = self.maulTimer > 20;
         try
         {
-            orig.Invoke(self, eu);
+            orig(self, eu);
         }
         finally
         {
@@ -172,7 +146,7 @@ public static class Hooks
     {
         if (!mauling)
         {
-            orig.Invoke(self, grasp, eu);
+            orig(self, grasp, eu);
         }
     }
 
@@ -180,84 +154,73 @@ public static class Hooks
     {
         if (!mauling)
         {
-            orig.Invoke(self, grasp);
+            orig(self, grasp);
         }
     }
 
     private static void Creature_Violence(On.Creature.orig_Violence orig, Creature self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos hitAppendage, Creature.DamageType type, float damage, float stunBonus)
     {
-        orig.Invoke(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
-        Room room = ((UpdatableAndDeletable)self).room;
-        bool bite = (ExtEnum<Creature.DamageType>)(object)type == (ExtEnum<Creature.DamageType>)(object)Creature.DamageType.Bite;
-        PhysicalObject obj = (source?.owner);
-        Player player1 = (Player)(object)((obj is Player) ? obj : null);
-        if (player1 != null && bite && (double)UnityEngine.Random.value <= 0.05)
+        orig(self, source, directionAndMomentum, hitChunk, hitAppendage, type, damage, stunBonus);
+
+        Room room = self.room;
+        bool bite = type == Creature.DamageType.Bite;
+
+        if (source?.owner is Player player && bite && UnityEngine.Random.value <= 0.05f)
         {
             if (!OptionsMenu.DisableSounds.Value && room != null)
-            {
-                room.PlaySound(Enums.yummers, ((PhysicalObject)self).firstChunk);
-            }
+                room.PlaySound(Enums.yummers, self.firstChunk);
+
             if (!OptionsMenu.NoMeatExtra.Value)
-            {
-                player1.AddQuarterFood();
-            }
+                player.AddQuarterFood();
         }
-        if ((source?.owner) is Player && bite && !OptionsMenu.DisableSounds.Value && room != null)
+
+        if (source?.owner is Player && bite && !OptionsMenu.DisableSounds.Value && room != null)
         {
-            room.PlaySound(Enums.munch, ((PhysicalObject)self).firstChunk);
+            room.PlaySound(Enums.munch, self.firstChunk);
         }
     }
 
     private static void Lizard_Violence(On.Lizard.orig_Violence orig, Lizard self, BodyChunk source, Vector2? directionAndMomentum, BodyChunk hitChunk, PhysicalObject.Appendage.Pos onAppendagePos, Creature.DamageType type, float damage, float stunBonus)
     {
-        orig.Invoke(self, source, directionAndMomentum, hitChunk, onAppendagePos, type, damage, stunBonus);
-        Room room = ((UpdatableAndDeletable)self).room;
-        bool bite = (ExtEnum<Creature.DamageType>)(object)type == (ExtEnum<Creature.DamageType>)(object)Creature.DamageType.Bite;
-        PhysicalObject obj = (source?.owner);
-        Player player1 = (Player)(object)((obj is Player) ? obj : null);
-        if (player1 != null && bite && (double)UnityEngine.Random.value <= 0.05)
+        orig(self, source, directionAndMomentum, hitChunk, onAppendagePos, type, damage, stunBonus);
+
+        Room room = self.room;
+        bool bite = type == Creature.DamageType.Bite;
+
+        if (source?.owner is Player player && bite && UnityEngine.Random.value <= 0.05f)
         {
             if (!OptionsMenu.DisableSounds.Value && room != null)
-            {
-                room.PlaySound(Enums.yummers, ((PhysicalObject)self).firstChunk);
-            }
+                room.PlaySound(Enums.yummers, self.firstChunk);
+
             if (!OptionsMenu.NoMeatExtra.Value)
-            {
-                player1.AddQuarterFood();
-            }
+                player.AddQuarterFood();
         }
-        if ((source?.owner) is Player && bite && !OptionsMenu.DisableSounds.Value && room != null)
+        if (source?.owner is Player && bite && !OptionsMenu.DisableSounds.Value && room != null)
         {
-            room.PlaySound(Enums.munch, ((PhysicalObject)self).firstChunk);
+            room.PlaySound(Enums.munch, self.firstChunk);
         }
     }
 
-    private static void Player_GrabUpdate(MonoMod.Cil.ILContext il)
+    private static void Player_GrabUpdate(ILContext il)
     {
         var cursor = new ILCursor(il);
         try
         {
-            if (cursor.TryGotoNext(
-            [
-                (Instruction i) => ILPatternMatchingExt.MatchLdsfld<Creature.DamageType>(i, "Bite")
-            ]) && cursor.TryGotoNext(
-            [
-                (Instruction i) => ILPatternMatchingExt.MatchCallOrCallvirt<Creature>(i, "Violence")
-            ]) && cursor.TryGotoPrev((MoveType)2,
-            [
-                (Instruction i) => ILPatternMatchingExt.MatchLdcR4(i, 1f)
-            ]))
+            if (cursor.TryGotoNext(i => i.MatchLdsfld<Creature.DamageType>(nameof(Creature.DamageType.Bite))) && 
+                cursor.TryGotoNext(i => i.MatchCallOrCallvirt<Creature>(nameof(Creature.Violence))) && 
+                cursor.TryGotoPrev(MoveType.After, i => i.MatchLdcR4(1f)))
             {
                 cursor.Emit(OpCodes.Ldarg_0);
-                cursor.EmitDelegate<Func<float, Player, float>>((Func<float, Player, float>)((float baseDamage, Player player) => 1f + OptionsMenu.MaulDamageExtra.Value));
+                cursor.EmitDelegate((float baseDamage, Player player) => 1f + OptionsMenu.MaulDamageExtra.Value);
             }
-            Plugin.DebugWarning("CUSTOM MAUL DAMAGE SET FROM MAUL ALIVE CREATURES");
+            else
+            {
+                Plugin.DebugError("Failed to find injection point for Player_GrabUpdate");
+            }
         }
         catch (Exception ex)
         {
-            Debug.LogError((object)"THE IL HOOK IN PLAYER GRAB UPDATE, DAMAGE, FAILED SO MUCH, SKILL ISSUE!");
-            Debug.LogException(ex);
-            Debug.LogError((object)il);
+            Plugin.DebugError("Got an Exception Player_GrabUpdate ILHook, report if you see this..." + ex);
             throw;
         }
     }
